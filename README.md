@@ -30,22 +30,22 @@ It supports all traditional and advanced terminal commands with an organized and
 ## ⚙️ Installation
 
 1. Clone the repository:  
-   ```bash
-   git clone https://github.com/blind-tech/accessible-terminal.git
-   cd accessible-terminal
+```bash
+git clone https://github.com/blind-tech/accessible-terminal.git
+cd accessible-terminal
 ````
 
 2. Install the requirements:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
 3. Run the application:
 
-   ```bash
-   python terminal.py
-   ```
+```bash
+python terminal.py
+```
 
 ---
 
