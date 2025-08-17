@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accessible Terminal</title>
+<style>
+:root{ --bg:#0f1720; --panel:#0b1220; --muted:#b8c1c8; --success:#8bd48b; --error:#ff7474; --warn:#ffd166; --accent:#2563eb; }
+body{font-family: system-ui, "Segoe UI", Roboto, "Noto Naskh Arabic", Arial; background:var(--bg); color:var(--muted); margin:0; padding:12px;}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+button{padding:6px 10px;border-radius:6px;border:none;background:var(--accent);color:white;cursor:pointer}
+#tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.tab{background:#081024;border-radius:8px;padding:6px 8px;cursor:pointer}
+.tab[aria-selected='true']{background:linear-gradient(180deg,#0b3765,#06335e);color:white}
+.panel{background:var(--panel);border-radius:8px;padding:10px}
+.cwd{margin-bottom:6px}
+.output{background:#07111a;border-radius:6px;padding:8px;height:320px;overflow:auto;white-space:pre-wrap;margin-bottom:8px;color:var(--muted)}
+.input-area{display:flex;gap:6px}
+input.command{flex:1;padding:8px;border-radius:6px;border:1px solid #23333f;background:#07111a;color:var(--muted)}
+.btn-small{padding:6px 8px}
+.out-success{color:var(--success)}
+.out-error{color:var(--error)}
+.out-warn{color:var(--warn)}
+.close{margin-left:8px;background:transparent;border:none;color:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div><strong>Accessible Terminal</strong></div>
+  <div>
+    <button id="newBtn" title="New session (Ctrl+T)">New session</button>
+    <button id="keysBtn" title="SSH keys menu">Keys</button>
+  </div>
+</header>
+<div id="tabs" role="tablist" aria-label="Sessions lists"></div>
+<div id="main"></div>
+
+<template id="template">
+  <div class="panel" role="tabpanel">
+    <div class="cwd">directory: <span class="cwd-path"></span></div>
+    <div class="output" role="log" aria-live="polite"></div>
+    <div class="input-area">
+      <input class="command" type="text" placeholder="Command Input" aria-label="Command Enter">
+      <button class="btn-small run">Run</button>
+      <button class="btn-small ssh-connect" title="SSH Connect">SSH</button>
+      <button class="btn-small ssh-disconnect" title="SSHDisconnect">Disconnect</button>
+    </div>
+  </div>
+</template>
+
+<script>
+let sessions = {};
+const tabsEl = document.getElementById('tabs');
+const mainEl = document.getElementById('main');
+const tmpl = document.getElementById('template');
+
+function py_createSession_impl(sid, cwd){
+    // avoid name collision
+    if (sessions[sid]) return;
+    const tab = document.createElement('button');
+    tab.className = 'tab';
+    tab.textContent = 'جلسة';
+    tab.setAttribute('data-sid', sid);
+    tab.setAttribute('role','tab');
+    tab.addEventListener('click', ()=> switchTo(sid));
+    const close = document.createElement('button'); close.textContent='×'; close.className='close';
+    close.addEventListener('click', (e)=> { e.stopPropagation(); closeSession(sid); });
+    tab.appendChild(close);
+    tabsEl.appendChild(tab);
+
+    const node = tmpl.content.cloneNode(true);
+    const panel = node.querySelector('.panel');
+    panel.setAttribute('data-sid', sid);
+    panel.querySelector('.cwd-path').textContent = cwd;
+    const output = panel.querySelector('.output');
+    const input = panel.querySelector('.command');
+    const runBtn = panel.querySelector('.run');
+    const sshBtn = panel.querySelector('.ssh-connect');
+    const sshDisc = panel.querySelector('.ssh-disconnect');
+
+    runBtn.addEventListener('click', ()=> runCommand(sid));
+    sshBtn.addEventListener('click', ()=> connectSSH(sid));
+    sshDisc.addEventListener('click', ()=> disconnectSSH(sid));
+
+    input.addEventListener('keydown', (e)=> {
+        if (e.key === 'Enter') { e.preventDefault(); runCommand(sid); }
+        else if (e.key === 'ArrowUp') { navigateHistory(sid, -1); }
+        else if (e.key === 'ArrowDown') { navigateHistory(sid, 1); }
+    });
+
+    mainEl.appendChild(panel);
+
+    sessions[sid] = { tab, panel, output, input };
+    switchTo(sid);
+}
+
+function py_createSession(sid, cwd){ py_createSession_impl(sid, cwd); }
+function py_appendOutput(sid, text, type){ appendOutput(sid, text, type); }
+function py_receiveKeys(keys){ alert("Configured keys:\n" + keys.join("\n")); }
+
+function switchTo(sid){
+    for (const k in sessions){
+        sessions[k].tab.removeAttribute('aria-selected');
+        sessions[k].panel.style.display = 'none';
+    }
+    const s = sessions[sid];
+    if (!s) return;
+    s.tab.setAttribute('aria-selected', 'true');
+    s.panel.style.display = 'block';
+    s.input.focus();
+}
+
+function closeSession(sid){
+    const s = sessions[sid];
+    if (!s) return;
+    s.tab.remove();
+    s.panel.remove();
+    delete sessions[sid];
+    const keys = Object.keys(sessions);
+    if (keys.length === 0) callPy('newsession');
+    else switchTo(keys[0]);
+}
+
+function appendOutput(sid, text, type){
+    const s = sessions[sid];
+    if (!s) return;
+    const el = document.createElement('div');
+    el.textContent = text;
+    if (type === 'error') el.className = 'out-error';
+    else if (type === 'warning') el.className = 'out-warn';
+    else el.className = 'out-success';
+    s.output.appendChild(el);
+    s.output.scrollTop = s.output.scrollHeight;
+}
+
+function runCommand(sid){
+    const s = sessions[sid];
+    if (!s) return;
+    const cmd = s.input.value.trim();
+    if (!cmd) return;
+    appendOutput(sid, '> ' + cmd, 'success');
+    callPy('run', { sid: sid, cmd: cmd });
+    s.input.value = '';
+}
+
+function connectSSH(sid){
+    const target = prompt('SSH target (e.g. user@host [-i /path/to/key] [-p port])');
+    if (!target) return;
+    appendOutput(sid, 'Connecting to: ' + target, 'success');
+    callPy('connect_ssh', { sid: sid, target: target });
+}
+
+function disconnectSSH(sid){
+    appendOutput(sid, 'Disconnecting SSH...', 'success');
+    callPy('disconnect_ssh', { sid: sid });
+}
+
+function navigateHistory(sid, dir){
+    // placeholder
+}
+
+function callPy(action, params){
+    const u = new URL('app://' + action + '/');
+    if (params){
+        for (const k in params){
+            u.searchParams.set(k, params[k]);
+        }
+    }
+    window.location.href = u.toString();
+}
+
+window.py_createSession = py_createSession_impl;
+window.py_appendOutput = py_appendOutput;
+window.py_receiveKeys = py_receiveKeys;
+
+document.getElementById('newBtn').addEventListener('click', ()=> callPy('newsession'));
+document.getElementById('keysBtn').addEventListener('click', ()=> callPy('get_keys'));
+
+// request initial session
+callPy('newsession');
+</script>
+</body>
+</html>
