@@ -59,7 +59,7 @@ You can fork the repository and then submit a pull request with your changes.
 ## License
 
 This project is licensed under the MIT License.
-See the [LICENSE](https://github.com/blind-tech/accessible-terminal/LICENSE) file for more details.
+See the [LICENSE](https://github.com/blind-tech/Accessible-Terminal/blob/main/License) file for more details.
 
 ---
 
