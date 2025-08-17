@@ -65,7 +65,7 @@ See the [LICENSE](https://github.com/blind-tech/Accessible-Terminal/blob/main/Li
 
 ## 🙏 Acknowledgments
 
-Special thanks to [**Abdullah Muhammed**](https://github.com/AbdullahMuhammed) for inspiring the idea of this project.
+Special thanks to [**Abdullah Muhammed**](https://github.com/aim9sour) for inspiring the idea of this project.
 Your vision and inspiration played an important role in making this application possible.
 
 ---
